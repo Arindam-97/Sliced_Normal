@@ -1,4 +1,4 @@
-import numpy as np
+import autograd.numpy as np
 from autograd.scipy.special import logsumexp
 from pymanopt import Problem
 from pymanopt.manifolds import SymmetricPositiveDefinite
