@@ -1,2 +1,3 @@
 pymanopt
 emcee
+hyppo
