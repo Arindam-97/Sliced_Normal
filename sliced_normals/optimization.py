@@ -8,7 +8,7 @@ from .features import get_F_and_Random_Samples
 from .fmle import FMLE
 
 def estimate_optimal_B(data, degree=2, n_grid=10000, verbosity=2,
-                       max_iterations=1000, min_gradient_norm=1e-6,
+                       max_iterations=1000, min_gradient_norm=1e-4,
                        penalty_lambda=0.0, penalize_excess_only=False):
     Z_df, Z_grid_df, volume = get_F_and_Random_Samples(data, degree, n_grid)
     Z = np.asarray(Z_df.values, dtype=np.float64)
