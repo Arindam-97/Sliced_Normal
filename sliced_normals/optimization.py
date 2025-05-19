@@ -6,6 +6,7 @@ from pymanopt.optimizers import SteepestDescent
 import pymanopt
 from .features import get_F_and_Random_Samples
 from .fmle import FMLE
+from pymanopt.function import numpy as pymanopt_numpy
 
 def estimate_optimal_B(data, degree=2, n_grid=10000, verbosity=2,
                        max_iterations=1000, min_gradient_norm=1e-4,
