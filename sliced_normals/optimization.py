@@ -10,7 +10,7 @@ from pymanopt.function import numpy as pymanopt_numpy
 
 def estimate_optimal_B(data, degree=2, n_grid=10000, verbosity=2,
                        max_iterations=1000, min_gradient_norm=1e-4,
-                       penalty_lambda=0.0, penalize_excess_only=False):
+                       penalty_lambda=0.0, winsor_threshold=1e-10):
     Z_df, Z_grid_df, volume = get_F_and_Random_Samples(data, degree, n_grid)
     Z = np.asarray(Z_df.values, dtype=np.float64)
     Z_grid = np.asarray(Z_grid_df.values, dtype=np.float64)
@@ -20,13 +20,23 @@ def estimate_optimal_B(data, degree=2, n_grid=10000, verbosity=2,
 
     @pymanopt.function.autograd(manifold)
     def cost(B):
+        # First term: empirical quadratic form
         term1 = np.mean(np.einsum("ij,jk,ik->i", Z, B, Z))
-        log_integral = logsumexp(-np.einsum("ij,jk,ik->i", Z_grid, B, Z_grid)) - np.log(len(Z_grid)) + np.log(volume)
-        penalty = penalty_lambda * max(np.sqrt(np.sum(B**2)) - frobenius_fmle, 0) if penalize_excess_only else penalty_lambda * np.sqrt(np.sum(B**2))
+
+        # Second term: integral approximation via log-sum-exp
+        quad_terms = np.einsum("ij,jk,ik->i", Z_grid, B, Z_grid)
+        log_integral_raw = logsumexp(-quad_terms) - np.log(len(Z_grid)) + np.log(volume)
+        log_integral = max(log_integral_raw, np.log(winsor_threshold))  # Winsorization
+
+        # Third term: Frobenius norm penalty
+        penalty = penalty_lambda * np.sqrt(np.sum(B**2))
+
         return term1 + log_integral + penalty
 
     problem = Problem(manifold=manifold, cost=cost)
-    optimizer = SteepestDescent(verbosity=verbosity, max_iterations=max_iterations, min_gradient_norm=min_gradient_norm)
+    optimizer = SteepestDescent(verbosity=verbosity,
+                                 max_iterations=max_iterations,
+                                 min_gradient_norm=min_gradient_norm)
     result = optimizer.run(problem, initial_point=B_fmle)
     return result.point
 
@@ -88,3 +98,39 @@ def estimate_optimal_B_with_grad(data, degree=2, n_grid=10000, verbosity=2,
     result = optimizer.run(problem, initial_point=B_fmle)
 
     return result.point
+
+
+
+def compute_integral(data, B, d, n_grid=10000):
+    """
+    Approximate the integral:
+        ∫ exp(-zᵀ B z) dz
+    over a bounding box enclosing the data, using random sampling.
+
+    Inputs:
+        data : pd.DataFrame or np.ndarray
+            Input dataset (used to determine the feature domain)
+        B : np.ndarray
+            Symmetric positive definite matrix (m × m)
+        d : int
+            Polynomial degree for feature expansion
+        n_grid : int
+            Number of uniform samples to draw for Monte Carlo integration
+
+    Returns:
+        integral : float
+            Approximation of the integral using uniform sampling
+    """
+    # Get features and volume using your helper
+    F, feature_sample, volume = get_F_and_Random_Samples(data, d, n_grid)
+
+    # Evaluate the exponent: zᵀ B z for each sample z
+    quad_vals = np.einsum("ij,jk,ik->i", feature_sample, B, feature_sample)
+
+    # Compute exp(-zᵀ B z) for all z in the grid
+    integrand_vals = np.exp(-quad_vals)
+
+    # Monte Carlo approximation: average × volume
+    integral = np.mean(integrand_vals) * volume
+    return integral
+
