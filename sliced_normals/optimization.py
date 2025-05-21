@@ -103,34 +103,27 @@ def estimate_optimal_B_with_grad(data, degree=2, n_grid=10000, verbosity=2,
 
 def compute_integral(data, B, d, n_grid=10000):
     """
-    Approximate the integral:
+    Efficiently approximate the integral:
         ∫ exp(-zᵀ B z) dz
-    over a bounding box enclosing the data, using random sampling.
+    over a bounding box enclosing the data, using Monte Carlo with uniform samples.
 
     Inputs:
         data : pd.DataFrame or np.ndarray
-            Input dataset (used to determine the feature domain)
-        B : np.ndarray
-            Symmetric positive definite matrix (m × m)
-        d : int
-            Polynomial degree for feature expansion
-        n_grid : int
-            Number of uniform samples to draw for Monte Carlo integration
+        B : np.ndarray, symmetric positive definite matrix (m × m)
+        d : int, polynomial degree for feature expansion
+        n_grid : int, number of random samples
 
     Returns:
-        integral : float
-            Approximation of the integral using uniform sampling
+        integral : float, Monte Carlo estimate of the integral
     """
-    # Get features and volume using your helper
-    F, feature_sample, volume = get_F_and_Random_Samples(data, d, n_grid)
+    _, Z_grid, volume = get_F_and_Random_Samples(data, d, n_grid)
 
-    # Evaluate the exponent: zᵀ B z for each sample z
-    quad_vals = np.einsum("ij,jk,ik->i", feature_sample, B, feature_sample)
+    # Compute quadratic form zᵀ B z for each z in the grid
+    quad_vals = np.einsum("ij,jk,ik->i", Z_grid, B, Z_grid)
 
-    # Compute exp(-zᵀ B z) for all z in the grid
-    integrand_vals = np.exp(-quad_vals)
+    # Use log-sum-exp trick to compute log(mean(exp(-quad_vals)))
+    log_mean_exp = logsumexp(-quad_vals) - np.log(len(Z_grid))
 
-    # Monte Carlo approximation: average × volume
-    integral = np.mean(integrand_vals) * volume
+    # Final estimate: integral ≈ mean × volume
+    integral = np.exp(log_mean_exp) * volume
     return integral
-
