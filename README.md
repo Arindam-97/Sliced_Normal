@@ -5,7 +5,7 @@ $x = (x_1,x_2,x_3)$ and $Z_x = (x_1,x_2,x_3,x_1^2,x_1x_2,x_1x_3,x_2^2,x_2x_3,x_3
 
 $$f(x) \propto \phi(Z_x| \mu,\Sigma) \propto e^{-\frac 12 (Z_x-\mu)^T\Sigma^{-1}(Z_x-\mu)}$$  
 
-Here, $\phi(Z_x |\mu,\Sigma)$ denote the density of a multivariate Gaussian at $Z_x$ with parameters $\mu$ and $\Sigma$. In particular, we fix a region $\delta$, where we are interested to model the data. We define:  
+Here, $\phi(Z_x |\mu,\Sigma)$ denotes the density of a multivariate Gaussian at $Z_x$ with parameters $\mu$ and $\Sigma$. In particular, we fix a region $\delta$, where we are interested to model the data. We define:
 
 $$c(\mu,\Sigma) = \int_{\Delta} \phi(Z_x| \mu,\Sigma) dx$$
 
