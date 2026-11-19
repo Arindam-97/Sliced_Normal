@@ -5,9 +5,9 @@ all monomials of total degree at most `d`, including 1. The fitted density is
 `f_B(x) = exp(-z(x).T @ B @ z(x)) / c(B)`, with positive semidefinite B.
 For three variables and degree 2 there are 10 features and a quartic energy.
 
-This branch uses fast fitting in the existing `sliced_normals` package. It caches
-empirical moments `S = Z.T @ Z / n`, evaluates their contribution as `<B,S>`,
-and shares integration energies between cost and analytic-gradient calculations.
+The default `sliced_normals` implementation caches empirical moments
+`S = Z.T @ Z / n`, evaluates their contribution as `<B,S>`, and shares
+integration energies between cost and analytic-gradient calculations.
 The full feature set/order, FMLE initialization, integration box/grid rule,
 SPD manifold, steepest-descent optimizer, default partition floor, and penalty
 are retained. Likelihood evaluation and MCMC sampling use the original methods.
@@ -42,9 +42,8 @@ samples = run_mcmc_sampler(data, B, d=2, num_samples=2000, burnin=300, thin=5)
 ```
 
 [Demo/Sliced_Normal_Usage.ipynb](Demo/Sliced_Normal_Usage.ipynb) contains the
-complete FMLE, fast fitting, approximate likelihood, sampling, and plotting
-workflow. Run from a checkout; it has no cloning/deletion commands or fixed
-Colab paths. No separate fast package or project configuration is required.
+complete FMLE, density fitting, approximate likelihood, sampling, and plotting
+workflow. The notebook runs from the repository checkout using relative paths.
 
 ## Numerical notes
 
