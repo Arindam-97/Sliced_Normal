@@ -139,5 +139,44 @@ def estimate_optimal_B(data, degree=2, n_grid=10000, verbosity=2,
     return optimizer.run(problem, initial_point=B_fmle).point
 
 
-# Compatibility helpers; the alternate legacy gradient remains experimental.
-from .legacy_optimization import compute_integral, estimate_optimal_B_with_grad
+def estimate_optimal_B_with_grad(data, degree=2, n_grid=10000, verbosity=2,
+                                 max_iterations=1000, min_gradient_norm=1e-6,
+                                 penalty_lambda=0.0):
+    """Cached analytic-gradient fit without the default partition floor.
+
+    Preserves this helper's historical unclipped objective and signature.
+    The shared derivative uses normalized weights without an extra volume factor.
+    """
+    return estimate_optimal_B(
+        data, degree=degree, n_grid=n_grid, verbosity=verbosity,
+        max_iterations=max_iterations, min_gradient_norm=min_gradient_norm,
+        penalty_lambda=max(penalty_lambda, 0.0), winsor_threshold=0.0,
+    )
+
+
+def compute_integral(data, B, d, n_grid=10000):
+    """
+    Efficiently approximate the integral:
+        ∫ exp(-zᵀ B z) dz
+    over a bounding box enclosing the data, using Monte Carlo with uniform samples.
+
+    Inputs:
+        data : pd.DataFrame or np.ndarray
+        B : np.ndarray, symmetric positive definite matrix (m × m)
+        d : int, polynomial degree for feature expansion
+        n_grid : int, number of random samples
+
+    Returns:
+        integral : float, Monte Carlo estimate of the integral
+    """
+    _, Z_grid, volume = get_F_and_Random_Samples(data, d, n_grid)
+
+    # Compute quadratic form zᵀ B z for each z in the grid
+    quad_vals = np.einsum("ij,jk,ik->i", Z_grid, B, Z_grid)
+
+    # Use log-sum-exp trick to compute log(mean(exp(-quad_vals)))
+    log_mean_exp = logsumexp(-quad_vals) - np.log(len(Z_grid))
+
+    # Final estimate: integral ≈ mean × volume
+    integral = np.exp(log_mean_exp) * volume
+    return integral

@@ -6,9 +6,7 @@ __pycache__/
 *.egg-info/
 build/
 dist/
-Demo/outputs/
-# Local project material is never part of this code repository.
 /arxiv_overleaf/
+/AGENTS.md
 /codex/
 /scratchpad/
-/AGENTS.md
