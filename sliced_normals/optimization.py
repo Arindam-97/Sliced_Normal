@@ -3,9 +3,13 @@
 1. Cache S = Z.T @ Z / n instead of scanning training rows at each evaluation.
 2. Cache grid energies at the last B and reuse them for an analytic gradient.
 
-The grid, feature ordering, FMLE, SPD manifold, steepest-descent optimizer,
+The grid, feature ordering, FMLE, SPD geometry, steepest-descent steps,
 partition floor, and Frobenius penalty match the original default fitter.
+Stopping is checked at the point that is returned, before another step is taken.
 """
+
+import time
+from copy import deepcopy
 
 import numpy as np
 from scipy.special import logsumexp
@@ -16,6 +20,82 @@ from pymanopt.optimizers import SteepestDescent
 
 from .features import get_F_and_Random_Samples
 from .fmle import FMLE
+
+
+class _SamePointSteepestDescent(SteepestDescent):
+    """Pymanopt steepest descent with consistent stopping and result metadata.
+
+    Pymanopt 2.2.1 steps before checking the previous gradient. This local
+    override checks the current point first, using the same manifold, line
+    search, and stopping thresholds. Iterations count completed search steps;
+    the final cost and gradient norm always describe the returned point.
+    """
+
+    def run(self, problem, *, initial_point=None, reuse_line_searcher=False):
+        manifold = problem.manifold
+        gradient = problem.riemannian_gradient
+        cost_evaluations = 0
+
+        def objective(point):
+            nonlocal cost_evaluations
+            cost_evaluations += 1
+            return problem.cost(point)
+
+        if not reuse_line_searcher or self.line_searcher is None:
+            self.line_searcher = deepcopy(self._line_searcher)
+        point = manifold.random_point() if initial_point is None else initial_point
+        self._initialize_log(
+            optimizer_parameters={"line_searcher": self.line_searcher}
+        )
+        iteration = 0
+        step_size = np.inf
+        start_time = time.time()
+        if self._verbosity >= 1:
+            print("Optimizing...")
+        if self._verbosity >= 2:
+            print("Iteration    Cost                       Gradient norm")
+
+        while True:
+            cost = float(objective(point))
+            grad = gradient(point)
+            gradient_norm = manifold.norm(point, grad)
+            if self._verbosity >= 2:
+                print(f"{iteration:5d}        {cost:+.16e}    {gradient_norm:.8e}")
+            self._add_log_entry(
+                iteration=iteration, point=point, cost=cost,
+                gradient_norm=gradient_norm,
+            )
+
+            # All stopping tests and the returned metadata concern this point.
+            # As in Pymanopt's SteepestDescent, the active limits are time,
+            # iterations, gradient norm, and step size; count actual cost calls
+            # for reporting rather than its iteration-based estimate.
+            if not np.isfinite(cost) or not np.isfinite(gradient_norm):
+                stopping_criterion = "Terminated - non-finite cost or gradient norm."
+            else:
+                stopping_criterion = self._check_stopping_criterion(
+                    start_time=start_time, iteration=iteration,
+                    gradient_norm=gradient_norm, step_size=step_size,
+                )
+                if stopping_criterion is None and gradient_norm == 0:
+                    stopping_criterion = "Terminated - zero gradient norm reached."
+            if stopping_criterion:
+                break
+
+            step_size, point = self.line_searcher.search(
+                objective, manifold, point, -grad, cost, -(gradient_norm**2)
+            )
+            iteration += 1
+
+        if self._verbosity >= 1:
+            print(stopping_criterion)
+            print("")
+        return self._return_result(
+            start_time=start_time, point=point, cost=cost, iterations=iteration,
+            stopping_criterion=stopping_criterion,
+            cost_evaluations=cost_evaluations, step_size=step_size,
+            gradient_norm=gradient_norm,
+        )
 
 
 class CachedObjective:
@@ -132,7 +212,7 @@ def estimate_optimal_B(data, degree=2, n_grid=10000, verbosity=2,
         return objective.gradient(B)
 
     problem = Problem(manifold=manifold, cost=cost, euclidean_gradient=gradient)
-    optimizer = SteepestDescent(
+    optimizer = _SamePointSteepestDescent(
         verbosity=verbosity, max_iterations=max_iterations,
         min_gradient_norm=min_gradient_norm,
     )

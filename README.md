@@ -51,8 +51,10 @@ Colab paths. No separate fast package or project configuration is required.
 - Full training/grid features remain in memory and feature count grows
   combinatorially. FMLE covariance inversion can fail for insufficient or
   poorly conditioned data.
-- Pymanopt 2.2.1 reports a pre-step gradient while returning a post-step matrix.
-  The demo recomputes the gradient at the returned matrix. A small manifold
+- The fitter uses Pymanopt's SPD geometry and line search with a local correction
+  to its stopping order: each stopping test uses the matrix that is returned.
+  Time/iteration limits and tiny-step stops can still leave the gradient above
+  tolerance. The demo independently checks the returned matrix. A small manifold
   gradient is not a certificate of global PSD optimality.
 - The likelihood helper returns an approximate mean log likelihood. Its support
   is derived from its input data; the demo uses the same data/support for both
