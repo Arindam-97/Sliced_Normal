@@ -1,1 +1,14 @@
 .DS_Store
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.venv*/
+*.egg-info/
+build/
+dist/
+Demo/outputs/
+# Local project material is never part of this code repository.
+/arxiv_overleaf/
+/codex/
+/scratchpad/
+/AGENTS.md

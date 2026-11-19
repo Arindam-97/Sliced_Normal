@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sliced-normals-fast"
+version = "0.2.0"
+description = "Sliced Normal density estimation with cached empirical moments and analytic gradients"
+readme = "README.md"
+requires-python = ">=3.10,<3.13"
+authors = [{name = "Arindam Roy Chowdhury"}]
+dependencies = [
+  "numpy>=1.26.4,<2", "pandas>=1.5.3,<3", "scipy>=1.13.1,<1.14",
+  "autograd==1.8.0", "pymanopt==2.2.1", "emcee==3.1.6", "tqdm>=4.66,<5",
+]
+
+[project.optional-dependencies]
+demo = ["matplotlib>=3.9,<4", "seaborn>=0.13,<0.14", "ipykernel>=6,<7", "nbformat>=5,<6", "nbclient>=0.10,<0.11", "jupyterlab>=4,<5", "threadpoolctl>=3,<4"]
+clustering = ["hyppo>=0.5,<0.6", "joblib>=1.3,<2"]
+
+[tool.setuptools.packages.find]
+include = ["sliced_normals", "sliced_normals_fast"]
+
+[tool.setuptools.package-data]
+sliced_normals = ["Sample_Data.csv"]

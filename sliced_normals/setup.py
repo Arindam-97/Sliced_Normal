@@ -1,20 +1,6 @@
-# Sliced_Normal/setup.py
-
-from setuptools import setup, find_packages
-
-setup(
-    name="sliced_normals",
-    version="0.1",
-    packages=find_packages(),
-    install_requires=[
-        "pymanopt",
-        "autograd",
-        "emcee",
-        "pandas",
-        "matplotlib",
-        "seaborn",
-        "scikit-learn"
-    ],
-    author="Arindam Roy Chowdhury",
-    description="Package for sliced normal density estimation and sampling",
-)
+"""Legacy installer entry point. Prefer `python -m pip install -e .` at the root."""
+from pathlib import Path
+import os
+from setuptools import setup
+os.chdir(Path(__file__).resolve().parents[1])
+setup()
