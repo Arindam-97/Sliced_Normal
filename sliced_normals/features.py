@@ -2,6 +2,23 @@ import autograd.numpy as np
 import pandas as pd
 from itertools import product
 
+
+def _normalize_sample_weight(sample_weight, n_samples):
+    """Validate positional sample weights; preserve None for legacy callers."""
+    if sample_weight is None:
+        return None
+    weights = np.asarray(sample_weight, dtype=float)
+    if (weights.shape != (n_samples,) or not np.isfinite(weights).all()
+            or np.any(weights < 0) or not np.any(weights > 0)):
+        raise ValueError(
+            "sample_weight must contain one nonnegative finite weight per row, "
+            "with positive total"
+        )
+    # Normalize without overflow or underflow in the sum of raw weights.
+    weights = weights / weights.max()
+    return weights / weights.sum()
+
+
 def Features(data, d):
     cols = data.columns
     coeffs = [i for i in product(range(d+1), repeat=len(cols)) if sum(i) <= d]
