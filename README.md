@@ -176,6 +176,93 @@ not the primal SN family. `info.integration_method`, `integration_sample_count`,
 and `integration_in_bounds_count` identify the integration used. Fresh proposal
 draws, integration ESS and batch variability should be checked independently.
 
+## Adaptive primal fitting
+
+`estimate_adaptive_primal_B` starts with the primal fit and adds selected
+squared combinations of its polynomials, without raising the polynomial degree.
+The same API handles equal and nonuniform observation weights:
+
+```python
+from sliced_normals import estimate_adaptive_primal_B
+
+B, info = estimate_adaptive_primal_B(
+    data, degree=2, sample_weight=None,  # Or your row-aligned weights w
+    max_added=30, add_per_round=5, random_state=42, return_info=True,
+)
+print(info.accepted_additions, info.search_stopping_reason)
+print(info.projected_gradient_norm, info.gradient_tolerance_met)
+print(info.audit)  # Paired baseline/adaptive checks on independent integration draws
+```
+
+For `psi = (1, h_1, ..., h_r)`, each new term is
+`beta * (a.T @ psi)**2`, with `beta >= 0`. Directions come from negative
+eigenvectors of the data-minus-model second-moment matrix. Each round proposes
+up to five additions and refits **all** old and new coefficients. A rejected
+batch is retried one direction at a time, starting from the latest accepted
+model and rechecking each remaining direction. The target of 30 additions is
+a cap; the search can stop earlier. Original coefficients retain their positive
+floor; added coefficients may be zero.
+
+`sample_weight` is normalized and used throughout the baseline, direction
+selection, coefficient fitting, acceptance scores, weighted empirical marginal
+CDFs and final likelihood audit. Zero-weight observations still define the box.
+Integration draws and model-generated samples are not observation-weighted.
+For plots, compare samples with weighted data histograms/CDFs or a reference
+resampled according to the observation weights.
+
+Acceptance requires the projected-gradient tolerance, decreased training NLL,
+a paired likelihood gain greater than `min_likelihood_gain` on **every** fresh
+screening batch, and sufficient integration ESS. The default marginal guard
+allows at most `marginal_cdf_tolerance=0.02` deterioration in each coordinate's
+CDF error relative to **both** the initial baseline and previous accepted model.
+It checks weighted empirical quantile thresholds; this is approximate marginal
+protection, not exact marginal preservation. A baseline failing gradient or
+training ESS checks is returned unchanged with an explicit stopping reason.
+
+Uniform box integration is the default. Narrow high-dimensional distributions
+such as F16 generally need a better proposal. Supply a callable
+`integration_sampler(rng, count)` returning independent points and their
+normalized log proposal densities. The sampler must cover the entire box and
+return all draws, including those outside it. For example, a broad Gaussian
+proposal can be combined with a uniform box component; always evaluate the
+**full mixture** density when returning its log densities.
+
+```python
+# integration_sampler is called separately for training, screening and audit.
+B, info = estimate_adaptive_primal_B(
+    data, degree=3, sample_weight=w, integration_sampler=draw_proposal,
+    n_grid=262144, n_screen=262144, n_audit=262144,
+    screen_batches=2, audit_batches=3, random_state=42, return_info=True,
+)
+```
+
+You may supply `integration_points` and `proposal_log_density` for training
+instead; fresh screens and audits still use the callback or uniform default.
+`n_screen` and `n_audit` default to `n_grid`. The final audit uses new draws
+after selection, compares baseline and adaptive models on the same draws, and
+does not influence acceptance. Screening batches are reused within each round's
+batch and individual retries. None of these numerical checks establishes
+held-out predictive performance or certifies integration accuracy.
+
+`info.history` records every trial and rejection reason; `info.round_history`
+records rounds. `info.coefficients`, `info.directions` and all gradient/objective
+diagnostics describe the final accepted model. `info.baseline_info` and
+`info.baseline_B` retain the baseline. `info.polynomials` contains all final
+atoms in the existing monomial order, so
+`B = (info.polynomials * info.coefficients) @ info.polynomials.T`.
+`info.success` concerns coefficient convergence; `info.search_stopping_reason`
+separately explains why adaptation stopped. `max_iterations` limits each fit;
+`max_rounds` limits adaptive rounds. No accepted addition means the exact
+baseline matrix is returned. Use `max_added=0` for a baseline-only run, or
+`audit_batches=0` to explicitly disable the independent audit.
+
+Fitting/screening caches require memory proportional to the integration draw
+count times the number of baseline polynomials. `chunk_size` limits temporary
+feature/moment blocks, but not those caches. The existing full-model and
+fixed-basis primal APIs are unchanged. This adaptive fit remains a restricted
+family and uses the same bounded-fitting/unbounded-general-sampler distinction
+described below.
+
 ## Numerical notes
 
 - Full training/grid features remain in memory and feature count grows
